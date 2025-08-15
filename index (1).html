@@ -962,8 +962,8 @@
                             <i class="fas fa-wallet"></i>
                             <select id="withdrawal-method">
                                 <option value="Binance">Binance</option>
-                                <option value="Tron">Tron</option>
-                                <option value="USDT">USDT</option>
+                                <option>Tron</option>
+                                <option>USDT</option>
                             </select>
                         </div>
                     </div>
@@ -1086,9 +1086,30 @@
         </nav>
     </div>
 
+    <!-- Monetag SDK -->
     <script src='//libtl.com/sdk.js' data-zone='9711122' data-sdk='show_9711122'></script>
 
-    <script>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyASr-ndZAKJdm1xloCartDbVJQ7DNXAuWg",
+            authDomain: "money-verse.firebaseapp.com",
+            projectId: "money-verse",
+            storageBucket: "money-verse.firebasestorage.app",
+            messagingSenderId: "569792993140",
+            appId: "1:569792993140:web:97033e86c28249d0f77e21",
+            measurementId: "G-P1VJKV6TLR"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         document.addEventListener('DOMContentLoaded', () => {
             const getUrlParams = () => {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -1121,7 +1142,7 @@
             const referredUsersCountEl = document.getElementById('referred-users-count');
             const shareTelegramBtn = document.getElementById('share-telegram-link');
             const shareWhatsappBtn = document.getElementById('share-whatsapp-link');
-            const shareFacebookBtn = document.getElementById('share-facebook-link');
+            const shareFacebookBtn = document.getElementById('share-facebook-f');
             const referFloatingBtn = document.getElementById('open-referral-modal-floating');
             const totalTasksEl = document.getElementById('total-tasks');
             const completedTasksEl = document.getElementById('completed-tasks');
@@ -1151,11 +1172,11 @@
             const telegramLogoProfile = document.getElementById('profile-logo');
 
             let appData = {
-                totalEarnings: 123.67,
+                totalEarnings: 0,
                 totalWithdrawals: 0,
-                adsWatchedTotal: 50,
-                earningsFromAds: 25.00,
-                referredUsersCount: 15,
+                adsWatchedTotal: 0,
+                earningsFromAds: 0,
+                referredUsersCount: 0,
                 totalTasks: 35,
                 completedTasksToday: 0,
                 lastAdWatchDate: null,
@@ -1164,19 +1185,31 @@
                 ]
             };
 
-            const savedData = localStorage.getItem(`appData_${params.telegramId}`);
-            if (savedData) {
-                appData = JSON.parse(savedData);
-            }
+            const userDocRef = doc(db, 'users', params.telegramId);
 
-            const saveData = () => {
-                localStorage.setItem(`appData_${params.telegramId}`, JSON.stringify(appData));
+            const loadData = async () => {
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    appData = { ...appData, ...docSnap.data() };
+                } else {
+                    await setDoc(userDocRef, {
+                        ...appData,
+                        telegramName: params.telegramName,
+                        username: params.username,
+                        telegramPhoto: params.telegramPhoto
+                    });
+                }
+                updateUI();
+                checkAndResetDailyTasks();
+            };
+
+            const saveData = async () => {
+                await updateDoc(userDocRef, appData);
             };
 
             const updateUI = () => {
                 const { totalEarnings, totalWithdrawals, adsWatchedTotal, earningsFromAds, referredUsersCount, completedTasksToday, totalTasks } = appData;
                 
-                // Set User Name and Logo
                 telegramNameDisplayEl.textContent = params.telegramName;
                 profileUsernameEl.textContent = params.username;
                 profileTelegramNameEl.textContent = params.telegramName;
@@ -1238,15 +1271,14 @@
                 updateUI();
             };
             
-            const checkAndResetDailyTasks = () => {
+            const checkAndResetDailyTasks = async () => {
                 const today = new Date().toISOString().slice(0, 10);
                 if (appData.lastAdWatchDate !== today) {
                     appData.completedTasksToday = 0;
                     appData.lastAdWatchDate = today;
-                    saveData();
+                    await saveData();
                 }
             };
-            checkAndResetDailyTasks();
 
             const renderNotifications = () => {
                 notificationList.innerHTML = '';
@@ -1296,6 +1328,7 @@
 
             const toggleFloatingButton = () => {
                 const currentView = document.querySelector('.page-section.active').id;
+                const referFloatingBtn = document.getElementById('open-referral-modal-floating');
                 if (currentView === 'dashboard-view') {
                     referFloatingBtn.style.display = 'none';
                 } else {
@@ -1303,6 +1336,7 @@
                 }
             };
 
+            // Event Listeners
             document.querySelectorAll('[data-target]').forEach(element => {
                 element.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -1313,17 +1347,17 @@
             backBtn.addEventListener('click', () => switchView('dashboard-view'));
             notificationBtn.addEventListener('click', () => switchView('notifications-view'));
 
-            startTaskBtn.addEventListener('click', () => {
+            startTaskBtn.addEventListener('click', async () => {
                 if (appData.completedTasksToday < appData.totalTasks) {
                     startTaskBtn.disabled = true;
                     startTaskBtn.innerHTML = 'Loading Ad... <i class="fas fa-spinner fa-spin"></i>';
                     
-                    const finishTask = () => {
+                    const finishTask = async () => {
                         appData.completedTasksToday++;
                         appData.adsWatchedTotal++;
                         appData.totalEarnings += 0.50;
                         appData.earningsFromAds += 0.50;
-                        saveData();
+                        await saveData();
                         updateUI();
                         startTaskBtn.disabled = false;
                         startTaskBtn.innerHTML = 'Start Task <i class="fas fa-play-circle"></i>';
@@ -1355,14 +1389,15 @@
                 });
             });
 
-            openReferralModalBtn.addEventListener('click', () => modal.style.display = 'flex');
-            openReferralModalBtnFloating.addEventListener('click', () => modal.style.display = 'flex');
-            closeModalBtn.addEventListener('click', () => modal.style.display = 'none');
+            const referralModal = document.getElementById('referralModal');
+            document.getElementById('open-referral-modal').addEventListener('click', () => referralModal.style.display = 'flex');
+            document.getElementById('open-referral-modal-floating').addEventListener('click', () => referralModal.style.display = 'flex');
+            document.querySelector('#referralModal .close-modal').addEventListener('click', () => referralModal.style.display = 'none');
             window.addEventListener('click', (event) => {
-                if (event.target === modal) modal.style.display = 'none';
+                if (event.target === referralModal) referralModal.style.display = 'none';
             });
 
-            copyButton.addEventListener('click', () => {
+            document.getElementById('copy-referral-link').addEventListener('click', () => {
                 const link = referralLinkElement.textContent;
                 navigator.clipboard.writeText(link).then(() => {
                     alert('Referral link copied to clipboard!');
@@ -1376,9 +1411,9 @@
             const referralLink = `https://t.me/${botUsername}?start=${params.telegramId}`;
             referralLinkElement.textContent = referralLink;
             const shareMessage = `Join my earning app and start earning money! My referral link: ${referralLink}`;
-            shareTelegramBtn.addEventListener('click', () => window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareMessage)}`, '_blank'));
-            shareWhatsappBtn.addEventListener('click', () => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareMessage)}`, '_blank'));
-            shareFacebookBtn.addEventListener('click', () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${encodeURIComponent(shareMessage)}`, '_blank'));
+            document.getElementById('share-telegram-link').addEventListener('click', () => window.open(`https://t.me/share/url?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareMessage)}`, '_blank'));
+            document.getElementById('share-whatsapp-link').addEventListener('click', () => window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareMessage)}`, '_blank'));
+            document.getElementById('share-facebook-link').addEventListener('click', () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(referralLink)}&quote=${encodeURIComponent(shareMessage)}`, '_blank'));
             
             withdrawalMethodEl.addEventListener('change', (e) => {
                 const method = e.target.value;
@@ -1391,7 +1426,7 @@
                 idInputEl.placeholder = idPlaceholders[method];
             });
 
-            submitWithdrawalBtn.addEventListener('click', () => {
+            submitWithdrawalBtn.addEventListener('click', async () => {
                 const method = withdrawalMethodEl.value;
                 const amount = parseFloat(amountInputEl.value);
                 const id = idInputEl.value;
@@ -1409,8 +1444,10 @@
                 appData.totalEarnings -= amount;
                 appData.totalWithdrawals += amount;
                 appData.notifications.unshift({ type: 'withdrawal', amount, method, status: 'pending', timestamp: new Date().toISOString() });
-                saveData();
+                await saveData();
 
+                const withdrawalSuccessModal = document.getElementById('withdrawalSuccessModal');
+                const withdrawalAmountDisplay = document.getElementById('withdrawal-amount-display');
                 withdrawalAmountDisplay.textContent = amount;
                 withdrawalSuccessModal.style.display = 'flex';
                 
@@ -1423,9 +1460,9 @@
                 idInputEl.value = '';
             });
 
-            closeWithdrawalModalBtn.addEventListener('click', () => withdrawalSuccessModal.style.display = 'none');
+            document.getElementById('close-withdrawal-modal').addEventListener('click', () => document.getElementById('withdrawalSuccessModal').style.display = 'none');
             
-            updateUI();
+            loadData();
             updateNotificationBadge();
             const referralBonusPercentage = 10;
             document.getElementById('referral-bonus-text').textContent = `Invite your friends and get a ${referralBonusPercentage}% bonus on their earnings!`;
