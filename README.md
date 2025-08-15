@@ -1,0 +1,2 @@
+# money-verse
+earn money
